@@ -1,6 +1,0 @@
-[submodule "sml"]
-	path = rml
-	url = https://github.com/Alphaverers/sml
-[submodule "loader"]
-	path = loader
-	url = https://github.com/Alphaverers/sunpadloader
