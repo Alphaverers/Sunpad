@@ -11,7 +11,7 @@ import java.util.List;
 public class DevTools extends GuiScreen {
 
     private final List<List<DevToolsElement>> elements = new ArrayList<>();
-    private int element = 0;
+    public static int element = 1;
     private final GuiScreen parent;
 
     private DevToolsRangeElement rangeElement = null;
@@ -47,7 +47,7 @@ public class DevTools extends GuiScreen {
                 case Keyboard.KEY_UP:
                     if (rangeElement != null) break;
                     element--;
-                    if (element == -1) {
+                    if (element == 0) {
                         element = elements.get(elements.size() - 1).size() - 1;
                     }
                     break;
@@ -55,7 +55,7 @@ public class DevTools extends GuiScreen {
                     if (rangeElement != null) break;
                     element++;
                     if (element == elements.get(elements.size() - 1).size()) {
-                        element = 0;
+                        element = 1;
                     }
                     break;
                 case Keyboard.KEY_LEFT:
@@ -79,7 +79,7 @@ public class DevTools extends GuiScreen {
                         rangeElement = null;
                         break;
                     }
-                    element = 0;
+                    element = 1;
                     elements.remove(elements.size() - 1);
                     break;
                 case Keyboard.KEY_ESCAPE:
@@ -99,13 +99,22 @@ public class DevTools extends GuiScreen {
         return elements;
     }
 
+    public static List<DevToolsElement> RenderPage() {
+        List<DevToolsElement> elements = new ArrayList<>();
+
+        elements.add(new DevToolsTitleElement("Render"));
+        elements.add(new DevToolsSubmenuElement("Skin render", skinRenderPage()));
+        elements.add(new DevToolsEnableColoredLighting());
+        elements.add(new DevToolsCreativeMenu());
+
+        return elements;
+    }
+
     public static List<DevToolsElement> mainPage() {
         List<DevToolsElement> elements = new ArrayList<>();
 
-        elements.add(new DevToolsTextElement("# Render"));
-        elements.add(new DevToolsSubmenuElement("> Skin render", skinRenderPage()));
-        elements.add(new DevToolsEnableColoredLighting());
-        elements.add(new DevToolsCreativeMenu());
+        elements.add(new DevToolsTitleElement("DevTools"));
+        elements.add(new DevToolsSubmenuElement("Render", RenderPage()));
 
         return elements;
     }
@@ -128,7 +137,7 @@ public class DevTools extends GuiScreen {
     }
 
     public void append(List<DevToolsElement> elements) {
-        element = 0;
+        element = 1;
         this.elements.add(elements);
     }
 

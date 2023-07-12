@@ -2,7 +2,7 @@ package net.minecraft.client.devtools;
 
 public abstract class DevToolsToggleElement implements DevToolsElement {
     protected boolean value;
-    private final String text;
+    private String text;
 
     public DevToolsToggleElement(String text, boolean value) {
         this.text = text;
@@ -11,7 +11,7 @@ public abstract class DevToolsToggleElement implements DevToolsElement {
 
     @Override
     public void render(DevTools screen, int x, int y, boolean selected) {
-        screen.drawString(text + ": " + (value ? "Yes" : "No"), x, y, selected ? 0xFFFFFF00 : 0xFFFFFFFF);
+        screen.drawString(selected ? "> " + text +  ": " + (value ? "Yes" : "No") + " <" : text + ": " + (value ? "Yes" : "No"), x, y, selected ? 0xFFFFFF00 : 0xFFFFFFFF);
     }
 
     @Override

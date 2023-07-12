@@ -4,18 +4,15 @@
   <component name="GradleSettings">
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
-        <option name="delegatedBuild" value="true" />
-        <option name="testRunner" value="GRADLE" />
-        <option name="distributionType" value="DEFAULT_WRAPPED" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="gradleJvm" value="liberica-1.8" />
         <option name="modules">
           <set>
-            <option value="/media/data/projects/java/Rosepad" />
-            <option value="/media/data/projects/java/Rosepad/client" />
-            <option value="/media/data/projects/java/Rosepad/loader" />
-            <option value="/media/data/projects/java/Rosepad/rml" />
-            <option value="/media/data/projects/java/Rosepad/server" />
+            <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/client" />
+            <option value="$PROJECT_DIR$/loader" />
+            <option value="$PROJECT_DIR$/rml" />
+            <option value="$PROJECT_DIR$/server" />
           </set>
         </option>
       </GradleProjectSettings>

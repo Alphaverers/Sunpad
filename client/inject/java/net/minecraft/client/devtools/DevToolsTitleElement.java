@@ -1,16 +1,16 @@
 package net.minecraft.client.devtools;
 
-public class DevToolsTextElement implements DevToolsElement {
+public class DevToolsTitleElement implements DevToolsElement {
 
     private final String text;
 
-    public DevToolsTextElement(String text) {
+    public DevToolsTitleElement(String text) {
         this.text = text;
     }
 
     @Override
     public void render(DevTools screen, int x, int y, boolean selected) {
-        screen.drawString(selected ? "> " + text + " <" : text, x, y, selected ? 0xFFFFFF00 : 0xFFFFFFFF);
+        screen.drawString(text, x, y, 0x0000FF);
     }
 
     @Override
