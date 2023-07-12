@@ -1,6 +1,6 @@
-[submodule "rml"]
+[submodule "sml"]
 	path = rml
-	url = https://github.com/RosepadMC/RML
+	url = https://github.com/Alphaverers/sml
 [submodule "loader"]
 	path = loader
-	url = https://github.com/RosepadMC/RosepadLoader
+	url = https://github.com/Alphaverers/sunpadloader
