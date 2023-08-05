@@ -1,0 +1,475 @@
+--- GameSettings.java
++++ GameSettings.java
+@@ -1,265 +1,223 @@
+ package net.minecraft.src;
+ 
+-import java.io.Writer;
+-import java.io.PrintWriter;
+-import java.io.FileWriter;
+-import java.io.Reader;
+-import java.io.BufferedReader;
+-import java.io.FileReader;
++import java.io.*;
+ import org.lwjgl.input.Keyboard;
+-import java.io.File;
+-import net.minecraft.client.Minecraft;
+ 
+-public class GameSettings {
+-    private static final String[] RENDER_DISTANCES;
+-    private static final String[] DIFFICULTY_LEVELS;
+-    public boolean musicVolume;
+-    public boolean soundVolume;
+-    public boolean invertMouse;
+-    public boolean showFPS;
+-    public int renderDistance;
+-    public boolean viewBobbing;
+-    public boolean anaglyph;
+-    public boolean limitFramerate;
+-    public boolean fancyGraphics;
+-    public KeyBinding keyBindForward;
+-    public KeyBinding keyBindLeft;
+-    public KeyBinding keyBindBack;
+-    public KeyBinding keyBindRight;
+-    public KeyBinding keyBindJump;
+-    public KeyBinding keyBindInventory;
+-    public KeyBinding keyBindDrop;
+-    public KeyBinding keyBindChat;
+-    public KeyBinding keyBindToggleFog;
+-    public KeyBinding[] keyBindings;
+-    protected Minecraft mc;
+-    private File optionsFile;
+-    public int numberOfOptions;
+-    public int difficulty;
+-    public boolean thirdPersonView;
+-    
++import net.buj.rml.options.GameOption;
++import net.buj.rml.options.GameOptions;
++import net.minecraft.client.*;
++
++public class GameSettings extends GameOptions {
++    public static final String[] RENDER_DISTANCES;
++    public static final String[] DIFFICULTY_LEVELS;
++    public static final String[] CHEAT_MENU_MODES;
++    public boolean invertMouse = false;
++    public int renderDistance = 1;
++    public int fov = 60;
++    public boolean viewBobbing = true;
++    public boolean anaglyph = false;
++    public boolean limitFramerate = false;
++    public boolean fancyGraphics = true;
++    public boolean acceptRemoteScripts = true;
++    public boolean renderQAName = true;
++    public boolean renderChunkName = true;
++    public boolean enableDiscordRPC = false;
++    public Minecraft mc;
++    public int difficulty = 2;
++    public int cheatMenuMode = 0;
++
+     static {
+         RENDER_DISTANCES = new String[] { "FAR", "NORMAL", "SHORT", "TINY" };
+         DIFFICULTY_LEVELS = new String[] { "Peaceful", "Easy", "Normal", "Hard", "Frail" };
++        CHEAT_MENU_MODES = new String[] { "Default", "One", "Stack", "Inf", "Disabled" };
+     }
+     
+     public GameSettings(final Minecraft minecraft, final File optionsLocation) {
+-        this.musicVolume = true;
+-        this.soundVolume = true;
+-        this.invertMouse = false;
+-        this.showFPS = false;
+-        this.renderDistance = 0;
+-        this.viewBobbing = true;
+-        this.anaglyph = false;
+-        this.limitFramerate = false;
+-        this.fancyGraphics = true;
+-        this.keyBindForward = new KeyBinding("Forward", 17);
+-        this.keyBindLeft = new KeyBinding("Left", 30);
+-        this.keyBindBack = new KeyBinding("Back", 31);
+-        this.keyBindRight = new KeyBinding("Right", 32);
+-        this.keyBindJump = new KeyBinding("Jump", 57);
+-        this.keyBindInventory = new KeyBinding("Inventory", 23);
+-        this.keyBindDrop = new KeyBinding("Drop", 16);
+-        this.keyBindChat = new KeyBinding("Chat", 20);
+-        this.keyBindToggleFog = new KeyBinding("Toggle fog", 33);
+-        this.keyBindings = new KeyBinding[] { this.keyBindForward, this.keyBindLeft, this.keyBindBack, this.keyBindRight, this.keyBindJump, this.keyBindDrop, this.keyBindInventory, this.keyBindChat, this.keyBindToggleFog };
+-        this.numberOfOptions = 10;
+-        this.difficulty = 2;
+-        this.thirdPersonView = false;
++        super(optionsLocation);
++
++        setDelimiter(":");
++
++        this.cheatMenuMode = 0;
++        this.renderQAName = true;
++        this.renderChunkName = true;
++        this.enableDiscordRPC = false;
+         this.mc = minecraft;
+-        this.optionsFile = new File(optionsLocation, "options.txt");
+-        this.loadOptions();
++
++        addDefault();
+     }
+-    
+-    public GameSettings() {
+-        this.musicVolume = true;
+-        this.soundVolume = true;
+-        this.invertMouse = false;
+-        this.showFPS = false;
+-        this.renderDistance = 0;
+-        this.viewBobbing = true;
+-        this.anaglyph = false;
+-        this.limitFramerate = false;
+-        this.fancyGraphics = true;
+-        this.keyBindForward = new KeyBinding("Forward", 17);
+-        this.keyBindLeft = new KeyBinding("Left", 30);
+-        this.keyBindBack = new KeyBinding("Back", 31);
+-        this.keyBindRight = new KeyBinding("Right", 32);
+-        this.keyBindJump = new KeyBinding("Jump", 57);
+-        this.keyBindInventory = new KeyBinding("Inventory", 23);
+-        this.keyBindDrop = new KeyBinding("Drop", 16);
+-        this.keyBindChat = new KeyBinding("Chat", 20);
+-        this.keyBindToggleFog = new KeyBinding("Toggle fog", 33);
+-        this.keyBindings = new KeyBinding[] { this.keyBindForward, this.keyBindLeft, this.keyBindBack, this.keyBindRight, this.keyBindJump, this.keyBindDrop, this.keyBindInventory, this.keyBindChat, this.keyBindToggleFog };
+-        this.numberOfOptions = 10;
+-        this.difficulty = 2;
+-        this.thirdPersonView = false;
++
++    private void addDefault() {
++        setOption(new GameOption.BooleanGameOption("discordRPC",
++                                                   new String[0],
++                                                   false,
++                                                   "ON", "OFF")
++                  .withListener(o -> {
++                          enableDiscordRPC = o.getValue();
++                          if (enableDiscordRPC) {
++                              DiscordRPCManager.start();
++                          }
++                          else {
++                              DiscordRPCManager.stop();
++                          }
++                  })
++                  .withName("Discord RPC"));
++
++        setOption(new GameOption.SliderIntegerGameOption("music",
++                                                         new String[] { "Sound options" },
++                                                         100,
++                                                         0, 100)
++                  .withListener(o -> {
++                          mc.sndManager.setMusicVolume(o.getValue());
++                          mc.sndManager.onSoundOptionsChanged();
++                  })
++                  .withName("Music volume"));
++        setOption(new GameOption.SliderIntegerGameOption("sound",
++                                                         new String[] { "Sound options" },
++                                                         100,
++                                                         0, 100)
++                  .withListener(o -> {
++                          mc.sndManager.setSoundVolume(o.getValue());
++                          mc.sndManager.onSoundOptionsChanged();
++                  })
++                  .withName("Sound volume"));
++
++        setOption(new GameOption.SliderChoiceGameOption("renderDistance",
++                                                         new String[] { "Render options" },
++                                                         1,
++                                                         RENDER_DISTANCES)
++                  .withListener(o -> {
++                          renderDistance = o.getValue();
++                  })
++                  .withName("Render distance"));
++        setOption(new GameOption.SliderIntegerGameOption("fov",
++                                                         new String[] { "Render options" },
++                                                         60,
++                                                         30, 140)
++                  .withListener(o -> {
++                          fov = o.getValue();
++                  })
++                  .withName("FOV"));
++        setOption(new GameOption.BooleanGameOption("invertYMouse",
++                                                   new String[] { "Render options" },
++                                                   false,
++                                                   "YES", "NO")
++                  .withListener(o -> {
++                          invertMouse = o.getValue();
++                  })
++                  .withName("Invert mouse"));
++        setOption(new GameOption.BooleanGameOption("bobView",
++                                                   new String[] { "Render options" },
++                                                   true,
++                                                   "YES", "NO")
++                  .withListener(o -> {
++                          viewBobbing = o.getValue();
++                  })
++                  .withName("View bobbing"));
++        setOption(new GameOption.BooleanGameOption("anaglyph3d",
++                                                   new String[] { "Render options" },
++                                                   false,
++                                                   "YES", "NO")
++                  .withListener(o -> {
++                          anaglyph = o.getValue();
++                          mc.renderEngine.refreshTextures();
++                  })
++                  .withName("3D anaglyph"));
++        setOption(new GameOption.BooleanGameOption("fancyGraphics",
++                                                   new String[] { "Render options" },
++                                                   true,
++                                                   "FANCY", "FAST")
++                  .withListener(o -> {
++                          fancyGraphics = o.getValue();
++                          mc.renderGlobal.loadRenderers();
++                  })
++                  .withName("Graphics"));
++        setOption(new GameOption.BooleanGameOption("limitFramerate",
++                                                   new String[] { "Render options" },
++                                                   false,
++                                                   "YES", "NO")
++                  .withListener(o -> {
++                          limitFramerate = o.getValue();
++                  })
++                  .withName("Limit framerate"));
++        setOption(new GameOption.SliderIntegerGameOption("guiScaling",
++                                                         new String[] { "Render options" },
++                                                         4,
++                                                         1, 4)
++                  .withListener(o -> {
++                          ScaledResolution.guiScaling = o.getValue();
++                          mc.displayGuiScreen(mc.currentScreen);
++                  })
++                  .withName("GUI scaling"));
++        setOption(new GameOption.BooleanGameOption("renderQAName",
++                                                   new String[] { "Render options" },
++                                                   true,
++                                                   "YES", "NO")
++                  .withListener(o -> {
++                          renderQAName = o.getValue();
++                  })
++                  .withName("Render QA name"));
++        setOption(new GameOption.BooleanGameOption("renderChunkName",
++                                                   new String[] { "Render options" },
++                                                   true,
++                                                   "YES", "NO")
++                  .withListener(o -> {
++                          renderChunkName = o.getValue();
++                  })
++                  .withName("Render chunk name"));
++
++        // TODO: Replace with DropdownGameOption once it's done
++        setOption(new GameOption.SliderChoiceGameOption("a1605ext_difficulty",
++                                                         new String[] { "Game options" },
++                                                         2,
++                                                         DIFFICULTY_LEVELS)
++                  .withListener(o -> {
++                          difficulty = o.getValue();
++                  })
++                  .withName("Difficulty"));
++        setOption(new GameOption.SliderChoiceGameOption("cheat_menu_mode",
++                                                         new String[] { "Game options" },
++                                                         0,
++                                                         CHEAT_MENU_MODES)
++                  .withListener(o -> {
++                          cheatMenuMode = o.getValue();
++                  })
++                  .withName("Cheat menu mode"));
++
++
++
++        setKeyBinding("forward", "Forward", Keyboard.KEY_W);
++        setKeyBinding("left", "Left", Keyboard.KEY_A);
++        setKeyBinding("right", "Right", Keyboard.KEY_D);
++        setKeyBinding("back", "Back", Keyboard.KEY_S);
++
++        setKeyBinding("jump", "Jump", Keyboard.KEY_SPACE);
++        setKeyBinding("dash", "Dash", Keyboard.KEY_LSHIFT);
++
++        setKeyBinding("inventory", "Inventory", Keyboard.KEY_E);
++        setKeyBinding("drop", "Drop", Keyboard.KEY_Q);
++        setKeyBinding("cheat_menu", "Cheat menu", Keyboard.KEY_V);
++
++        setKeyBinding("hide_gui", "Hide GUI", Keyboard.KEY_F1);
++        setKeyBinding("debug_menu", "Debug menu", Keyboard.KEY_F3);
++        setKeyBinding("toggle_fog", "Toggle fog", Keyboard.KEY_F);
++        setKeyBinding("third_person_view", "Third person view", Keyboard.KEY_F5);
++
++        setKeyBinding("chat", "Chat", Keyboard.KEY_T);
++        setKeyBinding("command", "Chat (Command)", Keyboard.KEY_SLASH);
+     }
+-    
+-    public String getKeyBindingDescription(final int bindingIndex) {
+-        return String.valueOf(this.keyBindings[bindingIndex].keyDescription) + ": " + Keyboard.getKeyName(this.keyBindings[bindingIndex].keyCode);
+-    }
+-    
+-    public void setKeyBinding(final int bindingIndex, final int keyCode) {
+-        this.keyBindings[bindingIndex].keyCode = keyCode;
+-        this.saveOptions();
+-    }
+-    
+-    public void setOptionValue(final int optionIndex, final int value) {
+-        if (optionIndex == 0) {
+-            this.musicVolume = !this.musicVolume;
+-            this.mc.sndManager.onSoundOptionsChanged();
++
++    public int getCheatMenuItemAmount(int type) {
++        if (type == 1 && this.cheatMenuMode == 0) return 1;
++        switch (this.cheatMenuMode) {
++        case 4:
++            return 0;
++        case 3:
++            return -127;
++        case 1:
++            return 1;
++        case 2:
++        default:
++            return 64;
+         }
+-        if (optionIndex == 1) {
+-            this.soundVolume = !this.soundVolume;
+-            this.mc.sndManager.onSoundOptionsChanged();
+-        }
+-        if (optionIndex == 2) {
+-            this.invertMouse = !this.invertMouse;
+-        }
+-        if (optionIndex == 3) {
+-            this.showFPS = !this.showFPS;
+-        }
+-        if (optionIndex == 4) {
+-            this.renderDistance = (this.renderDistance + value & 0x3);
+-        }
+-        if (optionIndex == 5) {
+-            this.viewBobbing = !this.viewBobbing;
+-        }
+-        if (optionIndex == 6) {
+-            this.anaglyph = !this.anaglyph;
+-            this.mc.renderEngine.refreshTextures();
+-        }
+-        if (optionIndex == 7) {
+-            this.limitFramerate = !this.limitFramerate;
+-        }
+-        if (optionIndex == 8) {
+-            this.difficulty = (this.difficulty + value) % 5;
+-        }
+-        if (optionIndex == 9) {
+-            this.fancyGraphics = !this.fancyGraphics;
+-            this.mc.renderGlobal.loadRenderers();
+-        }
+-        this.saveOptions();
+     }
+-    
+-    public String getOptionDisplayString(final int optionIndex) {
+-        if (optionIndex == 0) {
+-            return new StringBuilder().append("Music: ").append(this.musicVolume ? "ON" : "OFF").toString();
+-        }
+-        if (optionIndex == 1) {
+-            return new StringBuilder().append("Sound: ").append(this.soundVolume ? "ON" : "OFF").toString();
+-        }
+-        if (optionIndex == 2) {
+-            return new StringBuilder().append("Invert mouse: ").append(this.invertMouse ? "ON" : "OFF").toString();
+-        }
+-        if (optionIndex == 3) {
+-            return new StringBuilder().append("Show FPS: ").append(this.showFPS ? "ON" : "OFF").toString();
+-        }
+-        if (optionIndex == 4) {
+-            return new StringBuilder("Render distance: ").append(GameSettings.RENDER_DISTANCES[this.renderDistance]).toString();
+-        }
+-        if (optionIndex == 5) {
+-            return new StringBuilder().append("View bobbing: ").append(this.viewBobbing ? "ON" : "OFF").toString();
+-        }
+-        if (optionIndex == 6) {
+-            return new StringBuilder().append("3d anaglyph: ").append(this.anaglyph ? "ON" : "OFF").toString();
+-        }
+-        if (optionIndex == 7) {
+-            return new StringBuilder().append("Limit framerate: ").append(this.limitFramerate ? "ON" : "OFF").toString();
+-        }
+-        if (optionIndex == 8) {
+-            return new StringBuilder("Difficulty: ").append(GameSettings.DIFFICULTY_LEVELS[this.difficulty]).toString();
+-        }
+-        if (optionIndex == 9) {
+-            return new StringBuilder().append("Graphics: ").append(this.fancyGraphics ? "FANCY" : "FAST").toString();
+-        }
+-        return "";
+-    }
+-    
+-    public void loadOptions() {
+-        try {
+-            if (!this.optionsFile.exists()) {
+-                return;
+-            }
+-            final BufferedReader bufferedReader = new BufferedReader((Reader)new FileReader(this.optionsFile));
+-            String line;
+-            while ((line = bufferedReader.readLine()) != null) {
+-                if (line.startsWith("#")) {
+-                    continue;
+-                }
+-                final String[] split = line.split(":");
+-                if (split[0].equals("music")) {
+-                    this.musicVolume = split[1].equals("true");
+-                }
+-                if (split[0].equals("sound")) {
+-                    this.soundVolume = split[1].equals("true");
+-                }
+-                if (split[0].equals("invertYMouse")) {
+-                    this.invertMouse = split[1].equals("true");
+-                }
+-                if (split[0].equals("showFrameRate")) {
+-                    this.showFPS = split[1].equals("true");
+-                }
+-                if (split[0].equals("viewDistance")) {
+-                    this.renderDistance = Integer.parseInt(split[1]);
+-                }
+-                if (split[0].equals("bobView")) {
+-                    this.viewBobbing = split[1].equals("true");
+-                }
+-                if (split[0].equals("anaglyph3d")) {
+-                    this.anaglyph = split[1].equals("true");
+-                }
+-                if (split[0].equals("limitFramerate")) {
+-                    this.limitFramerate = split[1].equals("true");
+-                }
+-                if (split[0].equals("a1605ext_difficulty")) {
+-                    this.difficulty = Integer.parseInt(split[1]);
+-                }
+-                if (split[0].equals("a1605ext_gamepadSens")) {
+-                    InputHandler.lookSens = Integer.parseInt(split[1]);
+-                }
+-                if (split[0].equals("fancyGraphics")) {
+-                    this.fancyGraphics = split[1].equals("true");
+-                }
+-                for (int i = 0; i < this.keyBindings.length; ++i) {
+-                    if (split[0].equals(new StringBuilder("key_").append(this.keyBindings[i].keyDescription).toString())) {
+-                        this.keyBindings[i].keyCode = Integer.parseInt(split[1]);
+-                    }
+-                }
+-            }
+-            bufferedReader.close();
+-        }
+-        catch (Exception ex) {
+-            System.out.println("Failed to load options");
+-            ex.printStackTrace();
+-        }
+-    }
+-    
+-    public void saveOptions() {
+-        try {
+-            final PrintWriter printWriter = new PrintWriter((Writer)new FileWriter(this.optionsFile));
+-            printWriter.println(new StringBuilder().append("music:").append(this.musicVolume).toString());
+-            printWriter.println(new StringBuilder().append("sound:").append(this.soundVolume).toString());
+-            printWriter.println(new StringBuilder().append("invertYMouse:").append(this.invertMouse).toString());
+-            printWriter.println(new StringBuilder().append("showFrameRate:").append(this.showFPS).toString());
+-            printWriter.println(new StringBuilder().append("viewDistance:").append(this.renderDistance).toString());
+-            printWriter.println(new StringBuilder().append("difficulty:").append(Math.min(this.difficulty, 3)).toString());
+-            printWriter.println(new StringBuilder().append("bobView:").append(this.viewBobbing).toString());
+-            printWriter.println(new StringBuilder().append("anaglyph3d:").append(this.anaglyph).toString());
+-            printWriter.println(new StringBuilder().append("limitFramerate:").append(this.limitFramerate).toString());
+-            printWriter.println(new StringBuilder().append("fancyGraphics:").append(this.fancyGraphics).toString());
+-            printWriter.println("# Settings below are specific to 1605 extension.");
+-            printWriter.println(new StringBuilder().append("a1605ext_difficulty:").append(this.difficulty).toString());
+-            printWriter.println(new StringBuilder().append("a1605ext_gamepadSens:").append(InputHandler.lookSens).toString());
+-            for (int i = 0; i < this.keyBindings.length; ++i) {
+-                printWriter.println(new StringBuilder("key_").append(this.keyBindings[i].keyDescription).append(":").append(this.keyBindings[i].keyCode).toString());
+-            }
+-            printWriter.close();
+-        }
+-        catch (Exception ex) {
+-            System.out.println("Failed to save options");
+-            ex.printStackTrace();
+-        }
+-    }
+ }

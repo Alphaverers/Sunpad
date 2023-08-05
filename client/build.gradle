@@ -1,0 +1,209 @@
+import java.nio.file.*
+
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'com.brambolt.gradle.patching' version '2022.05.01-7057'
+}
+
+group 'net.buj'
+version '1.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+}
+
+dependencies {
+    implementation files('../libs/codecjorbis-20101023.jar')
+    implementation files('../libs/codecwav-20101023.jar')
+    implementation files('../libs/libraryjavasound-20101123.jar')
+    implementation files('../libs/librarylwjglopenal-20100824.jar')
+    shadow files('../libs/lwjgl.jar')
+    shadow files('../libs/lwjgl_util.jar')
+    implementation files('../libs/soundsystem-20120107.jar')
+    implementation group: 'org.json', name: 'json', version: '20220320'
+    implementation 'com.github.Vatuu:discord-rpc:1.6.2'
+    shadow project(':rml')
+    implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+}
+
+jar {
+    manifest {
+        attributes "Main-Class": "net.minecraft.client.Minecraft"
+    }
+}
+
+abstract class DeletePatches extends DefaultTask {
+
+    @Input
+    String rmPath = "none";
+
+    static def rm(Path path) {
+        File file = new File(path.toString())
+        if (file.isDirectory()) {
+            for (File sf : file.listFiles()) {
+                rm(sf.toPath())
+            }
+        }
+        file.delete()
+    }
+
+    @TaskAction
+    def delete() {
+        rm(Paths.get(rmPath))
+    }
+}
+
+abstract class InjectClasses extends DefaultTask {
+
+    @Input
+    String source = "none";
+    @Input
+    String dest = "none";
+
+    static def cp(Path source, Path dest) {
+        File file = new File(source.toString())
+        if (file.isDirectory()) {
+            dest.toFile().mkdirs()
+            for (String sf : file.list()) {
+                cp(source.resolve(sf), dest.resolve(sf))
+            }
+        }
+        else if (file.isFile()) {
+            Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
+    @TaskAction
+    def copy() {
+        cp(Paths.get(source), Paths.get(dest))
+    }
+}
+
+abstract class CreateInjectClasses extends DefaultTask {
+
+    @Input
+    String source = "none";
+    @Input
+    String orig = "none";
+    @Input
+    String dest = "none";
+    @Input
+    boolean modified = false;
+
+    // Stolen from https://stackoverflow.com/questions/27379059/determine-if-two-files-store-the-same-content/27379566#27379566
+    static boolean isModified(Path file1, Path file2) {
+        final long size = Files.size(file1);
+        if (size != Files.size(file2))
+            return false;
+
+        if (size < 4096)
+            return Arrays.equals(Files.readAllBytes(file1), Files.readAllBytes(file2));
+
+        try (InputStream is1 = Files.newInputStream(file1); InputStream is2 = Files.newInputStream(file2)) {
+            int data
+            while ((data = is1.read()) != -1)
+                if (data != is2.read())
+                    return false
+        }
+
+        return true
+    }
+
+    static def cpIfMissing(Path source, Path check, Path dest, boolean copyIfModified) {
+        File file = source.toFile()
+        if (file.isDirectory()) {
+            for (String sf : file.list()) {
+                cpIfMissing(source.resolve(sf), check.resolve(sf), dest.resolve(sf), copyIfModified)
+            }
+        }
+        else if (!check.toFile().exists() || copyIfModified && isModified(source, check)) {
+            dest.parent.toFile().mkdirs();
+            Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
+    static def rm(Path path) {
+        File file = new File(path.toString())
+        if (file.isDirectory()) {
+            for (File sf : file.listFiles()) {
+                rm(sf.toPath())
+            }
+        }
+        file.delete()
+    }
+
+    @TaskAction
+    def copy() {
+        rm(Paths.get(dest))
+        cpIfMissing(Paths.get(source), Paths.get(orig), Paths.get(dest), modified)
+    }
+}
+
+tasks.register("deletePatches", DeletePatches) {
+    rmPath = "${projectDir}/patches"
+}
+
+tasks.register("injectClasses", InjectClasses) {
+    source = "${projectDir}/inject"
+    dest = "${projectDir}/src/main"
+}
+
+tasks.register("ejectClasses", CreateInjectClasses) {
+    source = "${projectDir}/src/main/java"
+    orig = "${projectDir}/src/orig/java"
+    dest = "${projectDir}/inject/java"
+}
+
+// it was a bad idea
+
+//tasks.register("ejectResources", CreateInjectClasses) {
+//    source = "${projectDir}/src/main/resources"
+//    orig = "${projectDir}/src/orig/resources"
+//    dest = "${projectDir}/inject/resources"
+//
+//    modified = true
+//}
+
+processPatches {
+    content = "${projectDir}/src/orig/java"
+    patches = "${projectDir}/patches"
+    destination = "${projectDir}/src/main/java"
+}
+
+createPatches {
+    content = "${projectDir}/src/orig/java"
+    modified = "${projectDir}/src/main/java"
+    destination = "${projectDir}/patches"
+
+    dependsOn tasks.named("deletePatches").get()
+    dependsOn tasks.named("ejectClasses").get()
+    //dependsOn tasks.named("ejectResources").get()
+}
+
+tasks.named("compileJava") {
+    dependsOn("processPatches", "injectClasses")
+}
+
+shadowJar {
+    dependsOn "processPatches"
+    dependsOn "injectClasses"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+}

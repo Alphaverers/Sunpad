@@ -1,0 +1,184 @@
+--- NetworkManager.java
++++ NetworkManager.java
+@@ -1,4 +1,6 @@
+ package net.minecraft.src;
+ 
++import net.minecraft.client.Minecraft;
++
+ import java.io.IOException;
+ import java.util.Collections;
+@@ -10,15 +12,15 @@
+ 
+ public class NetworkManager {
+-    public static final Object threadSyncObject;
++    public static final Object threadSyncObject = new Object();
+     public static int numReadThreads;
+     public static int numWriteThreads;
+-    private Object sendQueueLock;
+-    private Socket networkSocket;
+-    private DataInputStream socketInputStream;
+-    private DataOutputStream socketOutputStream;
+-    boolean isRunning;
+-    private List<Packet> readPackets;
+-    private List<Packet> dataPackets;
+-    private List<Packet> chunkDataPackets;
++    private final Object sendQueueLock;
++    private final ConnectionChannelAdapter adapter;
++    private final DataInputStream socketInputStream;
++    private final DataOutputStream socketOutputStream;
++    public boolean isRunning;
++    private final List<Packet> readPackets;
++    private final List<Packet> dataPackets;
++    private final List<Packet> chunkDataPackets;
+     private NetHandler netHandler;
+     boolean isServerTerminating;
+@@ -31,16 +33,28 @@
+     private int chunkDataSendCounter;
+     private boolean isSwitchingHandler;
+-    
+-    static {
+-        threadSyncObject = new Object();
++    private Minecraft mc;
++    public boolean graceful = false;
++
++    public final ThreadNetworkKeepAlive keepAlive;
++
++    public boolean getIsRunning() {
++        synchronized (threadSyncObject) {
++            return isRunning;
++        }
+     }
++
++    public NetHandler getNetHandler() {
++        synchronized (threadSyncObject) {
++            return netHandler;
++        }
++    }
+     
+-    public NetworkManager(final Socket socket, final String name, final NetHandler netHandler) throws IOException {
++    public NetworkManager(final Minecraft mc, final ConnectionChannelAdapter adapter, final String name, final NetHandler netHandler) throws IOException {
+         this.isSwitchingHandler = false;
+         this.sendQueueLock = new Object();
+         this.isRunning = true;
+-        this.readPackets = (List<Packet>)Collections.synchronizedList((List)new LinkedList());
+-        this.dataPackets = (List<Packet>)Collections.synchronizedList((List)new LinkedList());
+-        this.chunkDataPackets = (List<Packet>)Collections.synchronizedList((List)new LinkedList());
++        this.readPackets = Collections.synchronizedList(new LinkedList<>());
++        this.dataPackets = Collections.synchronizedList(new LinkedList<>());
++        this.chunkDataPackets = Collections.synchronizedList(new LinkedList<>());
+         this.isServerTerminating = false;
+         this.isTerminating = false;
+@@ -49,13 +63,17 @@
+         this.sendQueueByteLength = 0;
+         this.chunkDataSendCounter = 0;
+-        this.networkSocket = socket;
++        this.adapter = adapter;
+         this.netHandler = netHandler;
+-        socket.setTrafficClass(24);
+-        this.socketInputStream = new DataInputStream(socket.getInputStream());
+-        this.socketOutputStream = new DataOutputStream(socket.getOutputStream());
+-        this.readThread = new NetworkReaderThread(this, String.valueOf(name) + " read thread");
+-        this.writeThread = new NetworkWriterThread(this, String.valueOf(name) + " write thread");
++        this.mc = mc;
++        adapter.finalize();
++        this.socketInputStream = new CountDataInputStream(adapter.getInputStream());
++        this.socketOutputStream = new CountDataOutputStream(adapter.getOutputStream());
++        this.keepAlive = new ThreadNetworkKeepAlive(this);
++        this.readThread = new NetworkReaderThread(keepAlive, this, name + " read thread");
++        this.writeThread = new NetworkWriterThread(this, name + " write thread");
+         this.readThread.start();
+         this.writeThread.start();
++        this.keepAlive.start();
++        ThreadBandwidthCounter.spawn();
+     }
+     
+@@ -73,5 +91,4 @@
+             }
+         }
+-        // monitorexit(this.sendQueueLock)
+     }
+     
+@@ -92,8 +109,7 @@
+                 final Packet packet;
+                 synchronized (this.sendQueueLock) {
+-                    packet = (Packet)this.dataPackets.remove(0);
++                    packet = this.dataPackets.remove(0);
+                     this.sendQueueByteLength -= packet.getPacketSize() + 1;
+                 }
+-                // monitorexit(this.sendQueueLock)
+                 Packet.writePacket(packet, this.socketOutputStream);
+             }
+@@ -102,8 +118,7 @@
+                 final Packet packet;
+                 synchronized (this.sendQueueLock) {
+-                    packet = (Packet)this.chunkDataPackets.remove(0);
++                    packet = this.chunkDataPackets.remove(0);
+                     this.sendQueueByteLength -= packet.getPacketSize() + 1;
+                 }
+-                // monitorexit(this.sendQueueLock)
+                 Packet.writePacket(packet, this.socketOutputStream);
+                 this.chunkDataSendCounter = 50;
+@@ -113,5 +128,5 @@
+             }
+         }
+-        catch (InterruptedException ex) {}
++        catch (InterruptedException ignored) {}
+         catch (Exception exception) {
+             if (!this.isTerminating) {
+@@ -129,4 +144,7 @@
+             else {
+                 this.networkShutdown("End of stream");
++                if (!graceful) {
++                    this.mc.displayGuiScreen(new GuiConnectFailed("Connection closed", "End of stream"));
++                }
+             }
+         }
+@@ -140,8 +158,9 @@
+     private void onNetworkError(final Exception exception) {
+         exception.printStackTrace();
+-        this.networkShutdown(new StringBuilder("Internal exception: ").append(exception.toString()).toString());
++        this.networkShutdown("Internal exception: " + exception.toString());
+     }
+     
+     public void networkShutdown(final String reason) {
++        System.out.println("Network closed: " + reason);
+         if (!this.isRunning) {
+             return;
+@@ -154,13 +173,13 @@
+             this.socketInputStream.close();
+         }
+-        catch (Throwable t) {}
++        catch (Throwable ignored) {}
+         try {
+             this.socketOutputStream.close();
+         }
+-        catch (Throwable t2) {}
++        catch (Throwable ignored) {}
+         try {
+-            this.networkSocket.close();
++            this.adapter.close();
+         }
+-        catch (Throwable t3) {}
++        catch (Throwable ignored) {}
+     }
+     
+@@ -171,8 +190,12 @@
+         if (this.sendQueueByteLength > 1048576) {
+             this.networkShutdown("Send buffer overflow");
++            this.mc.changeWorld1(null);
++            this.mc.displayGuiScreen(new GuiConnectFailed("Connection closed", "Send buffer overflow"));
+         }
+         if (this.readPackets.isEmpty()) {
+             if (this.timeSinceLastRead++ == 1200) {
+                 this.networkShutdown("Timed out");
++                this.mc.changeWorld1(null);
++                this.mc.displayGuiScreen(new GuiConnectFailed("Connection closed", "Timed out"));
+             }
+         }
+@@ -182,5 +205,5 @@
+         int n = 100;
+         while (!this.readPackets.isEmpty() && n-- >= 0 && !this.isSwitchingHandler) {
+-            ((Packet)this.readPackets.remove(0)).processPacket(this.netHandler);
++            this.readPackets.remove(0).processPacket(this.netHandler);
+         }
+         if (this.isTerminating && this.readPackets.isEmpty()) {
